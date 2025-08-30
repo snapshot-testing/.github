@@ -1,0 +1,92 @@
+name: Third Party Tests
+
+on:
+  workflow_call:
+    inputs:
+      swift-version:
+        default: '6.1'
+        required: false
+        type: string
+      platform:
+        required: true
+        type: string
+      coverage-enabled:
+        default: false
+        required: false
+        type: boolean
+      coverage-filename:
+        required: true
+        type: string
+      xcode-version:
+        default: '16.4'
+        required: false
+        type: string
+      macos-platform:
+        default: 'macOS-15'
+        required: false
+        type: string
+
+jobs:
+  third-party-tests:
+    runs-on: inputs.platform
+    steps:
+      - name: ☑️ Swift Select
+        uses: SwiftyLab/setup-swift@v1.11.0
+        with:
+            swift-version: inputs.swift-version
+
+      - name: ⬇️ Get Sources
+        uses: actions/checkout@v5.0.0
+
+      - name: ⚒️ Test Package
+        run: swift test --enable-code-coverage
+
+      - name: 🔀 Move contents
+        if: contains(inputs.platform, "ubuntu")
+        run: |
+          mkdir -f artifacts
+          cp -r $(find .build -name ${{ inputs.coverage-filename }} ! -path "*.dSYM*") artifacts
+          cp -r $(find .build -name default.profdata) artifacts
+
+      - name: 📤 Upload Artifacts
+        if: inputs.coverage-enabled
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: inputs.coverage-filename
+          path: artifacts
+
+  llvm-coverage-upload:
+    if: inputs.coverage-enabled
+    runs-on: inputs.macos-platform
+    depends: third-party-tests
+    steps:
+      - name: 📥 Download Artifacts
+        uses: actions/download-artifact@5.0.0
+        with:
+          name: inputs.coverage-filename
+
+      - name: ☑️ Xcode Select
+        run: sudo Xcode-select -switch /Applications/Xcode_${{ inputs.xcode-version }}.app
+
+      - name: 🖨️ LLVM Coverage Format
+        run: |
+          xcrun llvm-cov export $(find .build -name ${{ inputs.coverage-filename }}) \
+            -format="lcov" \
+            -instr-profile=$(find .build -name default.profdata) \
+            -ignore-filename-regex=".build|Tests" > ${{ inputs.coverage-filename }}.lcov
+
+      - name: 🔀 Move contents
+        run: |
+          rm -r artifacts
+          mkdir -f artifacts
+          cp -r ${{ inputs.coverage-filename }}.lcov artifacts
+
+      - name: 📤 Upload Artifacts
+        if: inputs.coverage-enabled
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: inputs.platform
+          path: artifacts
+
+
+

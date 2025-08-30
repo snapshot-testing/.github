@@ -24,9 +24,3 @@ Moreover, we greatly value your contribution to making RequestDL even better. Fe
 Currently, Snapshot Testing is supported on all Apple platforms, Linux and Windows.
 
 We are interested in expanding Snapshot Testing to other platforms supported by Swift. We would love your contribution to take Snapshot Testing even further.
-
-## Why the Tucano bird?
-
-The Request library, initially developed by Carson Katri in 2019, served as the foundation for RequestDL. However, in 2020, Brenno de Moura made contributions that eventually led to the point (2022) where he requested permission from Carson to continue the work independently, focusing on developing new features.
-
-RequestDL originated in Brazil 🇧🇷, and as a tribute to the country, the Tucano bird, which is a common symbol found in Brazilian brands, was chosen as its mascot. Embracing the advancements in technology in 2023, the artwork for RequestDL was created using the text-to-image generator feature of the Canvas software.

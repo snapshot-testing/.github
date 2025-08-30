@@ -1,0 +1,44 @@
+name: Apple Code Tests
+
+on:
+  workflow_call:
+    inputs:
+      xcode-version:
+        default: '16.4'
+        required: false
+        type: string
+      platform:
+        default: 'macOS-15'
+        required: false
+        type: string
+      package:
+        required: true
+        type: string
+      destination:
+        required: true
+        type: string
+      coverage-enabled:
+        default: false
+        required: false
+        type: boolean
+      coverage-filename:
+        required: true
+        type: string
+
+jobs:
+  apple-tests:
+    runs-on: ${{ inputs.platform }}
+    steps:
+      - name: ⬇️ Get Sources
+        uses: actions/checkout@v5.0.0
+
+      - name: ☑️ Xcode Select
+        run: sudo Xcode-select -switch /Applications/Xcode_${{ inputs.xcode-version }}.app
+
+      - name: 🖨️ LLVM Coverage Format
+        run: |
+          xcodebuild test \
+            -scheme "${{ inputs.package }}" \
+            -destination "${{ inputs.destination }}" \
+            -enableCodeCoverage YES \
+            -resultBundlePath "${{ inputs.coverage-filename }}.xcresult"
