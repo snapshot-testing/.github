@@ -42,20 +42,15 @@ jobs:
         run: swift test --enable-code-coverage
 
       - name: 🔀 Move contents
-        if: contains(inputs.platform, 'ubuntu')
+        if: contains(inputs.platform, 'ubuntu') || contains(inputs.platform, 'macos')
         run: |
           mkdir -p artifacts
-          # Copiar arquivo de cobertura (verificando se existe)
-          COVERAGE_FILE=$(find .build -name "${{ inputs.coverage-filename }}" ! -path "*.dSYM*" 2>/dev/null | head -n 1)
-          if [ -n "$COVERAGE_FILE" ]; then
-            cp -r "$COVERAGE_FILE" artifacts/
-          fi
 
-          # Copiar profdata (verificando se existe)
-          PROFDATA_FILE=$(find .build -name "default.profdata" 2>/dev/null | head -n 1)
-          if [ -n "$PROFDATA_FILE" ]; then
-            cp -r "$PROFDATA_FILE" artifacts/
-          fi
+          # Copiar todos os arquivos .xctest exceto os dentro de .dSYM
+          find .build -name "*.xctest" -exec cp -r {} artifacts/ \; 2>/dev/null || true
+
+          # Copiar todos os arquivos .profdata
+          find .build -name "*.profdata" -exec cp -r {} artifacts/ \; 2>/dev/null || true
 
       - name: 🔀 Move contents
         if: contains(inputs.platform, 'windows')
@@ -63,18 +58,14 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path artifacts -ErrorAction SilentlyContinue
 
-          $coverageFiles = Get-ChildItem -Path .build -Recurse -Filter "${{ inputs.coverage-filename }}" | Where-Object { $_.FullName -notlike "*.dSYM*" }
-          if ($coverageFiles) {
-              $coverageFiles | ForEach-Object {
-                  Copy-Item $_.FullName -Destination artifacts -Recurse
-              }
+          # Copiar todos os arquivos .xctest exceto os dentro de .dSYM
+          Get-ChildItem -Path .build -Recurse -Filter "*.xctest" | ForEach-Object {
+              Copy-Item $_.FullName -Destination artifacts -Recurse -Force
           }
 
-          $profdataFiles = Get-ChildItem -Path .build -Recurse -Filter "default.profdata"
-          if ($profdataFiles) {
-              $profdataFiles | ForEach-Object {
-                  Copy-Item $_.FullName -Destination artifacts
-              }
+          # Copiar todos os arquivos .profdata
+          Get-ChildItem -Path .build -Recurse -Filter "*.profdata" | ForEach-Object {
+              Copy-Item $_.FullName -Destination artifacts -Force
           }
 
       - name: 📤 Upload Artifacts
@@ -99,24 +90,50 @@ jobs:
 
       - name: 🖨️ LLVM Coverage Format
         run: |
-          COVERAGE_FILE=$(find . -name "${{ inputs.coverage-filename }}" | head -n 1)
-          PROFDATA_FILE=$(find . -name "default.profdata" | head -n 1)
+          # Encontrar todos os arquivos .profdata
+          PROFDATA_FILES=$(find . -name "*.profdata" | head -n 1)
+          PROFDATA_FILE="$PROFDATA_FILES"
 
-          if [ -n "$COVERAGE_FILE" ] && [ -n "$PROFDATA_FILE" ]; then
-            xcrun llvm-cov export "$COVERAGE_FILE" \
-              -format="lcov" \
-              -instr-profile="$PROFDATA_FILE" \
-              -ignore-filename-regex=".build|Tests" > ${{ inputs.coverage-filename }}.lcov
-          else
-            echo "Arquivos necessários não encontrados"
+          if [ -z "$PROFDATA_FILE" ]; then
+            echo "Nenhum arquivo .profdata encontrado"
             exit 1
           fi
+
+          # Encontrar todos os bundles .xctest
+          find . -name "*.xctest" -type d | while read -r xctest_bundle; do
+            if [ -n "$xctest_bundle" ]; then
+              # Extrair o nome base do bundle (sem .xctest)
+              BUNDLE_NAME=$(basename "$xctest_bundle" .xctest)
+
+              # Caminho para o executável dentro do bundle
+              EXECUTABLE_PATH="$xctest_bundle/Contents/MacOS/$BUNDLE_NAME"
+
+              # Verificar se o executável existe
+              if [ -f "$EXECUTABLE_PATH" ]; then
+                echo "Processando cobertura para: $BUNDLE_NAME"
+
+                # Nome do arquivo de saída
+                OUTPUT_FILE="${BUNDLE_NAME}.lcov"
+
+                # Gerar relatório de cobertura
+                xcrun llvm-cov export "$EXECUTABLE_PATH" \
+                  -format="lcov" \
+                  -instr-profile="$PROFDATA_FILE" \
+                  -ignore-filename-regex=".build|Tests" > "$OUTPUT_FILE"
+
+                echo "Gerado: $OUTPUT_FILE"
+              else
+                echo "Executável não encontrado em: $EXECUTABLE_PATH"
+              fi
+            fi
+          done
 
       - name: 🔀 Move contents
         run: |
           rm -rf artifacts
           mkdir -p artifacts
-          cp -r ${{ inputs.coverage-filename }}.lcov artifacts/
+          # Mover todos os arquivos .lcov gerados
+          find . -name "*.lcov" -exec cp {} artifacts/ \;
 
       - name: 📤 Upload Artifacts
         uses: actions/upload-artifact@v4.6.2
