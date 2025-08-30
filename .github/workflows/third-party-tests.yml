@@ -14,17 +14,6 @@ on:
         default: false
         required: false
         type: boolean
-      coverage-filename:
-        required: true
-        type: string
-      xcode-version:
-        default: '16.4'
-        required: false
-        type: string
-      macos-platform:
-        default: 'macOS-15'
-        required: false
-        type: string
 
 jobs:
   third-party-tests:
@@ -41,102 +30,11 @@ jobs:
       - name: ⚒️ Test Package
         run: swift test --enable-code-coverage
 
-      - name: 🔀 Move contents
-        if: contains(inputs.platform, 'ubuntu') || contains(inputs.platform, 'macos')
-        run: |
-          mkdir -p artifacts
-
-          # Copiar todos os arquivos .xctest exceto os dentro de .dSYM
-          find .build -name "*.xctest" -exec cp -r {} artifacts/ \; 2>/dev/null || true
-
-          # Copiar todos os arquivos .profdata
-          find .build -name "*.profdata" -exec cp -r {} artifacts/ \; 2>/dev/null || true
-
-      - name: 🔀 Move contents
-        if: contains(inputs.platform, 'windows')
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path artifacts -ErrorAction SilentlyContinue
-
-          # Copiar todos os arquivos .xctest exceto os dentro de .dSYM
-          Get-ChildItem -Path .build -Recurse -Filter "*.xctest" | ForEach-Object {
-              Copy-Item $_.FullName -Destination artifacts -Recurse -Force
-          }
-
-          # Copiar todos os arquivos .profdata
-          Get-ChildItem -Path .build -Recurse -Filter "*.profdata" | ForEach-Object {
-              Copy-Item $_.FullName -Destination artifacts -Force
-          }
-
       - name: 📤 Upload Artifacts
         if: inputs.coverage-enabled
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: ${{ inputs.coverage-filename }}
-          path: artifacts
-
-  llvm-coverage-upload:
-    if: inputs.coverage-enabled
-    needs: third-party-tests
-    runs-on: ${{ inputs.macos-platform }}
-    steps:
-      - name: 📥 Download Artifacts
-        uses: actions/download-artifact@5.0.0
-        with:
-          name: ${{ inputs.coverage-filename }}
-
-      - name: ☑️ Xcode Select
-        run: sudo xcode-select -switch /Applications/Xcode.app
-
-      - name: 🖨️ LLVM Coverage Format
-        run: |
-          # Encontrar todos os arquivos .profdata
-          PROFDATA_FILES=$(find . -name "*.profdata" | head -n 1)
-          PROFDATA_FILE="$PROFDATA_FILES"
-
-          if [ -z "$PROFDATA_FILE" ]; then
-            echo "Nenhum arquivo .profdata encontrado"
-            exit 1
-          fi
-
-          # Encontrar todos os bundles .xctest
-          find . -name "*.xctest" -type d | while read -r xctest_bundle; do
-            if [ -n "$xctest_bundle" ]; then
-              # Extrair o nome base do bundle (sem .xctest)
-              BUNDLE_NAME=$(basename "$xctest_bundle" .xctest)
-
-              # Caminho para o executável dentro do bundle
-              EXECUTABLE_PATH="$xctest_bundle/Contents/MacOS/$BUNDLE_NAME"
-
-              # Verificar se o executável existe
-              if [ -f "$EXECUTABLE_PATH" ]; then
-                echo "Processando cobertura para: $BUNDLE_NAME"
-
-                # Nome do arquivo de saída
-                OUTPUT_FILE="${BUNDLE_NAME}.lcov"
-
-                # Gerar relatório de cobertura
-                xcrun llvm-cov export "$EXECUTABLE_PATH" \
-                  -format="lcov" \
-                  -instr-profile="$PROFDATA_FILE" \
-                  -ignore-filename-regex=".build|Tests" > "$OUTPUT_FILE"
-
-                echo "Gerado: $OUTPUT_FILE"
-              else
-                echo "Executável não encontrado em: $EXECUTABLE_PATH"
-              fi
-            fi
-          done
-
-      - name: 🔀 Move contents
-        run: |
-          rm -rf artifacts
-          mkdir -p artifacts
-          # Mover todos os arquivos .lcov gerados
-          find . -name "*.lcov" -exec cp {} artifacts/ \;
-
-      - name: 📤 Upload Artifacts
-        uses: actions/upload-artifact@v4.6.2
-        with:
-          name: ${{ inputs.platform }}
-          path: artifacts
+          name: coverage-${{ inputs.platform }}
+          path: |
+            *.profdata
+            */*.xctest

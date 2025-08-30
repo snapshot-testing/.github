@@ -11,7 +11,7 @@ on:
         default: 'macOS-15'
         required: false
         type: string
-      package:
+      package-name:
         required: true
         type: string
       destination:
@@ -21,9 +21,6 @@ on:
         default: false
         required: false
         type: boolean
-      coverage-filename:
-        required: true
-        type: string
 
 jobs:
   apple-tests:
@@ -33,12 +30,26 @@ jobs:
         uses: actions/checkout@v5.0.0
 
       - name: ☑️ Xcode Select
-        run: sudo Xcode-select -switch /Applications/Xcode_${{ inputs.xcode-version }}.app
+        run: sudo xcode-select -switch /Applications/Xcode_${{ inputs.xcode-version }}.app
 
-      - name: 🖨️ LLVM Coverage Format
+      - name: 🧪 Run Tests with Coverage
         run: |
           xcodebuild test \
-            -scheme "${{ inputs.package }}" \
+            -scheme "${{ inputs.package-name }}" \
             -destination "${{ inputs.destination }}" \
             -enableCodeCoverage YES \
-            -resultBundlePath "${{ inputs.coverage-filename }}.xcresult"
+            -derivedDataPath .xcbuild
+
+      - name: 🔢 Generate MD5 of destination
+        if: inputs.coverage-enabled
+        run: |
+          echo "DEST_MD5=$(echo -n '${{ inputs.destination }}' | md5sum | cut -d ' ' -f1)" >> $GITHUB_ENV
+
+      - name: 📤 Upload Coverage Data
+        if: inputs.coverage-enabled
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: coverage-${{ env.DEST_MD5 }}
+          path: |
+            *.profdata
+            */*.xctest
