@@ -13,7 +13,7 @@ on:
         type: string
 
 jobs:
-  llvm-coverage-upload:
+  coverage-upload:
     runs-on: ${{ inputs.platform }}
     steps:
       - name: 📥 Download All Artifacts
