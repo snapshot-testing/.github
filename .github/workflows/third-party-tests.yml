@@ -28,12 +28,12 @@ on:
 
 jobs:
   third-party-tests:
-    runs-on: inputs.platform
+    runs-on: ${{ inputs.platform }}
     steps:
       - name: ☑️ Swift Select
         uses: SwiftyLab/setup-swift@v1.11.0
         with:
-            swift-version: inputs.swift-version
+          swift-version: ${{ inputs.swift-version }}
 
       - name: ⬇️ Get Sources
         uses: actions/checkout@v5.0.0
@@ -42,51 +42,84 @@ jobs:
         run: swift test --enable-code-coverage
 
       - name: 🔀 Move contents
-        if: contains(inputs.platform, "ubuntu")
+        if: contains(inputs.platform, 'ubuntu')
         run: |
-          mkdir -f artifacts
-          cp -r $(find .build -name ${{ inputs.coverage-filename }} ! -path "*.dSYM*") artifacts
-          cp -r $(find .build -name default.profdata) artifacts
+          mkdir -p artifacts
+          # Copiar arquivo de cobertura (verificando se existe)
+          COVERAGE_FILE=$(find .build -name "${{ inputs.coverage-filename }}" ! -path "*.dSYM*" 2>/dev/null | head -n 1)
+          if [ -n "$COVERAGE_FILE" ]; then
+            cp -r "$COVERAGE_FILE" artifacts/
+          fi
+
+          # Copiar profdata (verificando se existe)
+          PROFDATA_FILE=$(find .build -name "default.profdata" 2>/dev/null | head -n 1)
+          if [ -n "$PROFDATA_FILE" ]; then
+            cp -r "$PROFDATA_FILE" artifacts/
+          fi
+
+      - name: 🔀 Move contents
+        if: contains(inputs.platform, 'windows')
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts -ErrorAction SilentlyContinue
+
+          $coverageFiles = Get-ChildItem -Path .build -Recurse -Filter "${{ inputs.coverage-filename }}" | Where-Object { $_.FullName -notlike "*.dSYM*" }
+          if ($coverageFiles) {
+              $coverageFiles | ForEach-Object {
+                  Copy-Item $_.FullName -Destination artifacts -Recurse
+              }
+          }
+
+          $profdataFiles = Get-ChildItem -Path .build -Recurse -Filter "default.profdata"
+          if ($profdataFiles) {
+              $profdataFiles | ForEach-Object {
+                  Copy-Item $_.FullName -Destination artifacts
+              }
+          }
 
       - name: 📤 Upload Artifacts
         if: inputs.coverage-enabled
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: inputs.coverage-filename
+          name: ${{ inputs.coverage-filename }}
           path: artifacts
 
   llvm-coverage-upload:
     if: inputs.coverage-enabled
     needs: third-party-tests
-    runs-on: inputs.macos-platform
+    runs-on: ${{ inputs.macos-platform }}
     steps:
       - name: 📥 Download Artifacts
         uses: actions/download-artifact@5.0.0
         with:
-          name: inputs.coverage-filename
+          name: ${{ inputs.coverage-filename }}
 
       - name: ☑️ Xcode Select
-        run: sudo Xcode-select -switch /Applications/Xcode_${{ inputs.xcode-version }}.app
+        run: sudo xcode-select -switch /Applications/Xcode.app
 
       - name: 🖨️ LLVM Coverage Format
         run: |
-          xcrun llvm-cov export $(find .build -name ${{ inputs.coverage-filename }}) \
-            -format="lcov" \
-            -instr-profile=$(find .build -name default.profdata) \
-            -ignore-filename-regex=".build|Tests" > ${{ inputs.coverage-filename }}.lcov
+          COVERAGE_FILE=$(find . -name "${{ inputs.coverage-filename }}" | head -n 1)
+          PROFDATA_FILE=$(find . -name "default.profdata" | head -n 1)
+
+          if [ -n "$COVERAGE_FILE" ] && [ -n "$PROFDATA_FILE" ]; then
+            xcrun llvm-cov export "$COVERAGE_FILE" \
+              -format="lcov" \
+              -instr-profile="$PROFDATA_FILE" \
+              -ignore-filename-regex=".build|Tests" > ${{ inputs.coverage-filename }}.lcov
+          else
+            echo "Arquivos necessários não encontrados"
+            exit 1
+          fi
 
       - name: 🔀 Move contents
         run: |
-          rm -r artifacts
-          mkdir -f artifacts
-          cp -r ${{ inputs.coverage-filename }}.lcov artifacts
+          rm -rf artifacts
+          mkdir -p artifacts
+          cp -r ${{ inputs.coverage-filename }}.lcov artifacts/
 
       - name: 📤 Upload Artifacts
-        if: inputs.coverage-enabled
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: inputs.platform
+          name: ${{ inputs.platform }}
           path: artifacts
-
-
-
