@@ -36,5 +36,5 @@ jobs:
         with:
           name: coverage-${{ inputs.platform }}
           path: |
-            *.profdata
-            */*.xctest
+            .build/**/*.profdata
+            .build/**/*.xctest

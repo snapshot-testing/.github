@@ -51,5 +51,5 @@ jobs:
         with:
           name: coverage-${{ env.DEST_MD5 }}
           path: |
-            *.profdata
-            */*.xctest
+            .xcbuild/**/*.profdata
+            .xcbuild/**/*.xctest
