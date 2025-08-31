@@ -13,11 +13,13 @@ Documentation is available at [Swift Package Index](https://swiftpackageindex.co
 
 ## Our Objective
 
-Our goal is to simplify and streamline the networking layer coding process by leveraging the declarative programming paradigm. The smoothness that SwiftUI brings to app implementation has inspired us to create RequestDL.
+Our goal is to simplify and streamline UI testing across the **entire Apple ecosystem** (iOS, macOS, watchOS, and tvOS) by making it effortless to validate the visual consistency of your interfaces. Inspired by the need for reliable, maintainable, and human-readable tests, **SnapshotTesting** empowers developers to catch unintended visual regressions with minimal setup—ensuring your UI remains pixel-perfect across devices, OS versions, and design iterations.
 
-We are constantly implementing new features, exploring what the community is currently using, and following international standards that define the functionality of HTTP resources.
+Beyond Apple platforms, **SnapshotTesting** extends its utility to **Linux and Windows environments**, enabling snapshot validation for *non-UI scenarios* where structural precision matters. For example, it allows you to snapshot complex objects like `URLRequest` (encoded as cURL commands), network payloads, or custom data models—ensuring consistency in API contracts, backend logic, or cross-platform tooling. This flexibility makes SnapshotTesting a versatile ally whether you’re validating a SwiftUI layout or debugging a network request.
 
-Moreover, we greatly value your contribution to making RequestDL even better. Feel free to open an issue, discuss an idea, implement a new feature, or simply have a chat with the community.
+We’re continuously refining the library to align with community needs and modern testing practices. At the same time, we believe visual consistency is a cornerstone of quality assurance and **strongly advocate for Apple to integrate snapshot-based validation directly into [XCUIAutomation](https://developer.apple.com/documentation/xcuiautomation)**. This would empower developers to focus on scenarios where the goal isn’t validating *user flows* (e.g., "Does button X navigate to screen Y?"), but verifying the *visual fidelity* of interfaces—ensuring layouts, fonts, colors, and states remain consistent without brittle, script-heavy tests.
+
+We deeply value your collaboration! Whether you’re testing a UIKit view on macOS, a cURL snapshot on Linux, or proposing enhancements for Apple’s platforms, your contributions help shape a tool that serves the **entire ecosystem**. Open an issue, share feedback, or dive into the code—let’s build more resilient UIs *and* systems, together. 🖼️✨
 
 ## Platforms
 
