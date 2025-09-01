@@ -40,6 +40,15 @@ jobs:
               (
                 cd "$artifact_dir"
 
+                # Extrair o nome do diretório (remove "artifacts/" e "/")
+                ARTIFACT_DIR_NAME=$(basename "$artifact_dir")
+
+                # Gerar MD5 do nome do diretório
+                ARTIFACT_MD5=$(echo -n "$ARTIFACT_DIR_NAME" | md5sum | cut -d ' ' -f1)
+
+                echo "Artifact directory: $ARTIFACT_DIR_NAME"
+                echo "MD5: $ARTIFACT_MD5"
+
                 # Encontrar todos os arquivos .profdata
                 PROFDATA_FILES=$(find . -name "*.profdata" | head -n 1)
                 PROFDATA_FILE="$PROFDATA_FILES"
@@ -55,15 +64,16 @@ jobs:
                     # Extrair o nome base do bundle (sem .xctest)
                     BUNDLE_NAME=$(basename "$xctest_bundle" .xctest)
 
-                    # Caminho para o executável dentro do bundle
-                    EXECUTABLE_PATH="$xctest_bundle/Contents/MacOS/$BUNDLE_NAME"
+                    # Procurar o executável usando glob pattern (funciona em todas as plataformas)
+                    EXECUTABLE_PATH=$(find "$xctest_bundle" -name "$BUNDLE_NAME" -type f -not -path "*/.dSYM/*" | head -n 1)
 
                     # Verificar se o executável existe
-                    if [ -f "$EXECUTABLE_PATH" ]; then
+                    if [ -n "$EXECUTABLE_PATH" ] && [ -f "$EXECUTABLE_PATH" ]; then
                       echo "Processando cobertura para: $BUNDLE_NAME"
+                      echo "Executável encontrado em: $EXECUTABLE_PATH"
 
-                      # Nome do arquivo de saída (na raiz do workspace)
-                      OUTPUT_FILE="${{ github.workspace }}/${BUNDLE_NAME}.lcov"
+                      # Nome do arquivo de saída usando MD5 do artifact directory
+                      OUTPUT_FILE="${{ github.workspace }}/${ARTIFACT_MD5}.lcov"
 
                       # Gerar relatório de cobertura
                       xcrun llvm-cov export "$EXECUTABLE_PATH" \
@@ -73,7 +83,8 @@ jobs:
 
                       echo "Gerado: $OUTPUT_FILE"
                     else
-                      echo "Executável não encontrado em: $EXECUTABLE_PATH"
+                      echo "Executável não encontrado para: $BUNDLE_NAME"
+                      echo "Buscado em: $xctest_bundle"
                     fi
                   fi
                 done
